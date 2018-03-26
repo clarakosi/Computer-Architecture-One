@@ -44,6 +44,18 @@ class CPU {
         clearInterval(this.clock);
     }
 
+    HLT() {
+        this.stopClock();
+    }
+
+    LDI(index, value) {
+        this.reg[index] = value
+    }
+
+    PRN(index) {
+        return console.log(this.reg[index]);
+    }
+
     /**
      * ALU functionality
      *
@@ -58,6 +70,8 @@ class CPU {
         switch (op) {
             case 'MUL':
                 // !!! IMPLEMENT ME
+                
+                this.reg[regA] = this.reg[regA] * this.reg[regB];
                 break;
         }
     }
@@ -70,18 +84,37 @@ class CPU {
         // from the memory address pointed to by the PC. (I.e. the PC holds the
         // index into memory of the next instruction.)
 
+        let IR = this.ram.read(this.reg.PC).toString(2);
+
         // !!! IMPLEMENT ME
 
         // Debugging output
-        //console.log(`${this.reg.PC}: ${IR.toString(2)}`);
+        // console.log(`${this.reg.PC}: ${IR.toString(2)}`);
 
         // Get the two bytes in memory _after_ the PC in case the instruction
         // needs them.
+        let operandA = this.ram.read(this.reg.PC + 1);
+        let operandB = this.ram.read(this.reg.PC + 2);
+
+        // console.log(`operandA: ${operandA}`); // 0
+        // console.log(`operandB: ${operandB}`); // 8
 
         // !!! IMPLEMENT ME
 
         // Execute the instruction. Perform the actions for the instruction as
         // outlined in the LS-8 spec.
+        if (parseInt(IR, 2) === parseInt('10011001', 2)) {
+            this.LDI(operandA, operandB);
+        } else if (parseInt(IR, 2) === parseInt('01000011', 2)) {
+            this.PRN(operandA);
+        } else {
+            this.HLT();            
+        }
+
+
+        // else if (parseInt(IR, 2) === parseInt('10101010', 2)) {
+        //     this.alu('MUL', operandA, operandB);
+        // }
 
         // !!! IMPLEMENT ME
 
@@ -89,8 +122,15 @@ class CPU {
         // can be 1, 2, or 3 bytes long. Hint: the high 2 bits of the
         // instruction byte tells you how many bytes follow the instruction byte
         // for any particular instruction.
-        
         // !!! IMPLEMENT ME
+
+
+        let instBytes = parseInt(IR.toString(2).slice(0,2), 2);
+        this.reg.PC = instBytes + 1;
+
+        console.log(`newPC: ${this.reg.PC}`);
+        // console.log(`newIR: ${this.ram.read(this.reg.PC).toString(2)}`);
+        // console.log(`first2: ${parseInt(IR.toString(2).slice(0,2), 2)}`); // 2
     }
 }
 
