@@ -10,6 +10,8 @@ const HLT = 0b00000001;
 const LDI = 0b10011001;
 const PRN = 0b01000011;
 const MUL = 0b10101010;
+const PUSH = 0b01001101;
+const POP = 0b01001100;
 
 class CPU {
 
@@ -23,6 +25,7 @@ class CPU {
         
         // Special-purpose registers
         this.reg.PC = 0; // Program Counter
+        this.reg[7] = this.ram.read(Number(0xf4.toString()));
     }
 	
     /**
@@ -99,6 +102,16 @@ class CPU {
             this.alu('MUL', operandA, operandB);
         }
         
+        const handle_PUSH = () => {
+            this.reg[7] -= 1;
+            this.ram.write(this.reg[7], this.reg[operandA]);
+        }
+
+        const handle_POP = () => {
+            this.reg[operandA] = this.ram.read(this.reg[7]);
+            this.reg[7] += 1;
+        }
+        
         // switch(IR) {
         //     case LDI: 
         //     handle_LDI(operandA, operandB);
@@ -122,7 +135,9 @@ class CPU {
             [LDI]: handle_LDI,
             [PRN]: handle_PRN,
             [HLT]: handle_HLT,
-            [MUL]: handle_MUL
+            [MUL]: handle_MUL,
+            [POP]: handle_POP,
+            [PUSH]: handle_PUSH
         }
         
         branchTable[IR](operandA, operandB)
