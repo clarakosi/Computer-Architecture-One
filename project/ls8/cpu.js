@@ -12,6 +12,10 @@ const PRN = 0b01000011;
 const MUL = 0b10101010;
 const PUSH = 0b01001101;
 const POP = 0b01001100;
+const CALL = 0b01001000;
+const RET = 0b00001001;
+const ADD = 0b10101000;
+
 
 class CPU {
 
@@ -68,8 +72,12 @@ class CPU {
         switch (op) {
             case 'MUL':
             // !!! IMPLEMENT ME
-            this.reg[regA] = this.reg[regA] * this.reg[regB];
+                this.reg[regA] = this.reg[regA] * this.reg[regB];
             break;
+            case 'ADD':
+                this.reg[regA] = this.reg[regA] + this.reg[regB];
+            break;
+
         }
     }
     
@@ -82,6 +90,7 @@ class CPU {
         // index into memory of the next instruction.)
         
         let IR = this.ram.read(this.reg.PC);
+        let callHandler;
         
         let operandA = this.ram.read(this.reg.PC + 1);
         let operandB = this.ram.read(this.reg.PC + 2);
@@ -111,25 +120,20 @@ class CPU {
             this.reg[operandA] = this.ram.read(this.reg[7]);
             this.reg[7] += 1;
         }
-        
-        // switch(IR) {
-        //     case LDI: 
-        //     handle_LDI(operandA, operandB);
-        //     break;
-        //     case PRN: 
-        //     handle_PRN(operandA);
-        //     break;
-        //     case HLT:
-        //     handle_HLT();
-        //     break;
-        //     case MUL:
-        //     handle_MUL();
-        //     break;
-        //     default:
-        //     console.log("Unknown instructions: " + IR.toString(2));
-        //     handle_HLT()
-        //     break;
-        // }
+        const handle_RET = () => {
+            callHandler = this.ram.read(this.reg[7]);
+            this.reg[7] += 1;
+            return callHandler;
+        }
+        const handle_CALL = () => {
+            this.reg[7] -= 1;
+            this.ram.write(this.reg[7], this.reg.PC + (IR >>> 6) + 1)
+            callHandler = this.reg[operandA];
+            return callHandler;
+        }
+        const handle_ADD = () => {
+            this.alu('ADD', operandA, operandB);
+        }
 
         const branchTable = {
             [LDI]: handle_LDI,
@@ -137,12 +141,19 @@ class CPU {
             [HLT]: handle_HLT,
             [MUL]: handle_MUL,
             [POP]: handle_POP,
-            [PUSH]: handle_PUSH
+            [PUSH]: handle_PUSH,
+            [CALL]: handle_CALL,
+            [RET]: handle_RET,
+            [ADD]: handle_ADD,
         }
         
-        branchTable[IR](operandA, operandB)
-
-        this.reg.PC += (IR >>> 6) + 1;
+        branchTable[IR](operandA, operandB);
+        
+        if (callHandler) {
+            this.reg.PC = callHandler;
+        } else {
+            this.reg.PC += (IR >>> 6) + 1;            
+        }
     }
 }
 
