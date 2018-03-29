@@ -15,6 +15,10 @@ const POP = 0b01001100;
 const CALL = 0b01001000;
 const RET = 0b00001001;
 const ADD = 0b10101000;
+const ST = 0b10011010;
+const PRA = 0b01000010;
+const IRET = 0b00001011;
+const JMP = 0b01010000;
 
 
 class CPU {
@@ -46,6 +50,7 @@ class CPU {
         const _this = this;
 
         this.clock = setInterval(() => {
+            this.intTimer();
             _this.tick();
         }, 1); // 1 ms delay == 1 KHz clock == 0.000001 GHz
     }
@@ -80,6 +85,37 @@ class CPU {
 
         }
     }
+
+    intTimer() {
+        if(this.reg[5]) {
+            console.log('Timer interrupted');
+            this.reg[6] = 0b00000001;
+            let maskedInterrupts = this.reg[5] & this.reg[6];
+            for (let i = 0; i < 8; i++) {
+                let interruptHappened = ((maskedInterrupts >> i) & 1) == 1;
+                if (interruptHappened) {
+                    // console.log('Interrupt happened at index: ', i);
+                    // console.log('R6', this.reg[6]);
+                    this.reg[5] = 0; // disable further interrupts
+                    this.reg[6] = 0; // reset IS register
+                    // PC TO STACK
+                    this.reg[7] -= 1;
+                    this.ram.write(this.reg[7], this.reg.PC);
+                    // console.log('PC address before:', this.reg.PC);
+                    // FL register??
+                    // add registers R0-R6 to stack
+                    for(let i = 0; i <= 6; i++) {
+                        this.reg[7] -= 1;
+                        this.ram.write(this.reg[7], this.reg[i]);
+                        // console.log(`Register${i}: ${this.reg[i]}`)
+                    }
+                    this.reg.PC = this.ram.read(0xF8);
+                } else {
+                    return;
+                }
+            }
+        }
+    }
     
     /**
      * Advances the CPU one cycle
@@ -91,6 +127,8 @@ class CPU {
         
         let IR = this.ram.read(this.reg.PC);
         let callHandler;
+        let interruptHandler;
+        let JMPhandler; 
         
         let operandA = this.ram.read(this.reg.PC + 1);
         let operandB = this.ram.read(this.reg.PC + 2);
@@ -135,6 +173,29 @@ class CPU {
             this.alu('ADD', operandA, operandB);
         }
 
+        const handle_ST = () => {
+            this.ram.write(this.reg[operandA], this.reg[operandB]);
+        }
+        
+        const handle_PRA = () => {
+           console.log(String.fromCharCode(this.reg[operandA]));
+        } 
+
+        const handle_IRET = () => {
+            for(let i = 6; i >= 0; i--) {
+                this.reg[i] = this.ram.read(this.reg[7])
+                this.reg[7] += 1;
+                // console.log(`Register${i} after: ${this.reg[i]}`)
+            }
+            interruptHandler = this.ram.read(this.reg[7])
+            // console.log('PC After interrupt', this.reg.PC);
+        }
+
+        const handle_JMP = () => {
+            // console.log('JMP', this.reg[operandA]);
+            JMPhandler = this.reg[operandA];
+        }
+
         const branchTable = {
             [LDI]: handle_LDI,
             [PRN]: handle_PRN,
@@ -145,12 +206,19 @@ class CPU {
             [CALL]: handle_CALL,
             [RET]: handle_RET,
             [ADD]: handle_ADD,
+            [ST]: handle_ST,
+            [PRA]: handle_PRA,
+            [IRET]: handle_IRET,
+            [JMP]: handle_JMP
         }
         
         branchTable[IR](operandA, operandB);
-        
-        if (callHandler) {
+        if (interruptHandler) {
+            this.reg.PC = interruptHandler;
+        } else if (callHandler) {
             this.reg.PC = callHandler;
+        } else if (JMPhandler) {
+            this.reg.PC = JMPhandler
         } else {
             this.reg.PC += (IR >>> 6) + 1;            
         }
